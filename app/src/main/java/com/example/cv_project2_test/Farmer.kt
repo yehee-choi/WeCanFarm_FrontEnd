@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-// Farmer.kt - 농부 대시보드 (작물 검사 기록 피드 포함)
+// Farmer.kt - 농부 대시보드 (간소화된 작물 검사 기록 포함)
 package com.example.cv_project2_test
 
 import android.graphics.Bitmap
@@ -36,7 +36,7 @@ import java.io.ByteArrayOutputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-// 컬러 정의 추가
+// 컬러 정의
 object HomeColors {
     val Primary = Color(0xFFD9D277)
     val Secondary = Color(0xFF738903)
@@ -46,18 +46,14 @@ object HomeColors {
     val Border = Color(0xFFDDE2DD)
 }
 
-// 작물 검사 기록 데이터 클래스
+// 간소화된 작물 검사 기록 데이터 클래스 (4가지 핵심 정보만)
 data class PlantDetectionRecord(
     val id: String = "",
     val userId: Int = 0,
-    val timestamp: String = "",
-    val cropType: String = "",
-    val diseaseStatus: String = "",
-    val diseaseConfidence: Double = 0.0,
-    val yoloConfidence: Double = 0.0,
-    val label: String = "",
-    val imageBase64: String = "",
-    val recommendations: String = ""
+    val timestamp: String = "", // 촬영 날짜
+    val cropType: String = "",  // 작물 종류
+    val diseaseStatus: String = "", // 병해 상태
+    val imageBase64: String = "" // 촬영한 이미지
 )
 
 // 농부 대시보드용 데이터 클래스들
@@ -84,11 +80,11 @@ data class RecentActivity(
     val icon: ImageVector
 )
 
-// 검사 기록 저장소 객체
+// 검사 기록 저장소 객체 (간소화)
 object PlantDetectionHistory {
     private val detectionRecords = mutableStateListOf<PlantDetectionRecord>()
 
-    // 새로운 검사 기록 추가
+    // 새로운 검사 기록 추가 (4가지 핵심 정보만)
     fun addDetection(
         userId: Int,
         detectionResponse: DetectionResponse,
@@ -105,7 +101,7 @@ object PlantDetectionHistory {
                 imageBase64 = Base64.encodeToString(outputStream.toByteArray(), Base64.DEFAULT)
             }
 
-            // 검출된 각 항목에 대해 기록 생성
+            // 검출된 각 항목에 대해 간단한 기록 생성
             detectionResponse.detections.forEach { detection ->
                 val record = PlantDetectionRecord(
                     id = "${userId}_${System.currentTimeMillis()}_${detection.hashCode()}",
@@ -113,15 +109,10 @@ object PlantDetectionHistory {
                     timestamp = timestamp,
                     cropType = detection.crop_type,
                     diseaseStatus = detection.disease_status,
-                    diseaseConfidence = detection.disease_confidence,
-                    yoloConfidence = detection.yolo_confidence,
-                    label = detection.label,
-                    imageBase64 = imageBase64,
-                    recommendations = generateRecommendations(detection)
+                    imageBase64 = imageBase64
                 )
 
                 detectionRecords.add(0, record) // 최신 기록을 맨 앞에 추가
-
                 Log.d("PlantDetectionHistory", "새 검사 기록 추가: ${detection.crop_type} - ${detection.disease_status}")
             }
 
@@ -145,32 +136,17 @@ object PlantDetectionHistory {
         return detectionRecords.toList()
     }
 
-    // 통계 계산
+    // 건강한 검사 수
     fun getHealthyDetectionsCount(userId: Int): Int {
         return detectionRecords.count {
             it.userId == userId && it.diseaseStatus.contains("healthy", ignoreCase = true)
         }
     }
 
+    // 불건전한 검사 수
     fun getUnhealthyDetectionsCount(userId: Int): Int {
         return detectionRecords.count {
             it.userId == userId && !it.diseaseStatus.contains("healthy", ignoreCase = true)
-        }
-    }
-
-    // 질병 상태에 따른 권장사항 생성
-    private fun generateRecommendations(detection: Detection): String {
-        return when {
-            detection.disease_status.contains("healthy", ignoreCase = true) ->
-                "✅ 건강한 상태입니다. 현재 관리를 지속하세요."
-            detection.disease_status.contains("rust", ignoreCase = true) ->
-                "⚠️ 녹병이 의심됩니다. 습도를 낮추고 구리 기반 살균제를 사용하세요."
-            detection.disease_status.contains("blight", ignoreCase = true) ->
-                "🚨 마름병이 의심됩니다. 감염된 부위를 제거하고 살균제를 뿌리세요."
-            detection.disease_status.contains("spot", ignoreCase = true) ->
-                "📍 반점병이 의심됩니다. 통풍을 개선하고 감염된 잎을 제거하세요."
-            else ->
-                "🔍 추가 관찰이 필요합니다. 전문가와 상담을 고려해보세요."
         }
     }
 }
@@ -195,7 +171,7 @@ fun WeCanFarmFarmerScreen(
     val unhealthyCount = PlantDetectionHistory.getUnhealthyDetectionsCount(currentUserId)
     val totalDetections = detectionRecords.size
 
-    // 샘플 작물 데이터 (기존 유지)
+    // 샘플 작물 데이터
     val cropData = listOf(
         CropData(
             cropName = "방울토마토",
@@ -269,14 +245,14 @@ fun WeCanFarmFarmerScreen(
             DashboardStatsSection(dashboardStats)
         }
 
-        // AI 진단 기록 섹션 (새로 추가)
+        // AI 진단 기록 섹션 (간소화된 버전)
         if (detectionRecords.isNotEmpty()) {
             item {
                 SectionTitle("최근 AI 진단 기록")
             }
 
             items(detectionRecords.take(5)) { record ->
-                PlantDetectionRecordCard(record)
+                SimplePlantDetectionCard(record)
             }
 
             if (detectionRecords.size > 5) {
@@ -326,8 +302,9 @@ fun WeCanFarmFarmerScreen(
     }
 }
 
+// 간소화된 검사 기록 카드 (4가지 핵심 정보만 표시)
 @Composable
-fun PlantDetectionRecordCard(record: PlantDetectionRecord) {
+fun SimplePlantDetectionCard(record: PlantDetectionRecord) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -336,54 +313,14 @@ fun PlantDetectionRecordCard(record: PlantDetectionRecord) {
         colors = CardDefaults.cardColors(containerColor = HomeColors.Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 헤더 정보
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = record.cropType,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = HomeColors.OnSurface
-                    )
-                    Text(
-                        text = record.timestamp,
-                        fontSize = 14.sp,
-                        color = HomeColors.Secondary
-                    )
-                }
-
-                // 건강 상태 뱃지
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (record.diseaseStatus.contains("healthy", ignoreCase = true))
-                        Color(0xFF4CAF50).copy(alpha = 0.1f)
-                    else
-                        Color(0xFFFF9800).copy(alpha = 0.1f)
-                ) {
-                    Text(
-                        text = record.diseaseStatus,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (record.diseaseStatus.contains("healthy", ignoreCase = true))
-                            Color(0xFF4CAF50)
-                        else
-                            Color(0xFFFF9800)
-                    )
-                }
-            }
-
-            // 검사 이미지 (있는 경우)
+            // 촬영한 이미지
             if (record.imageBase64.isNotEmpty()) {
                 val imageBytes = runCatching { Base64.decode(record.imageBase64, Base64.DEFAULT) }.getOrNull()
                 imageBytes?.let { bytes ->
@@ -395,65 +332,82 @@ fun PlantDetectionRecordCard(record: PlantDetectionRecord) {
                             bitmap = it.asImageBitmap(),
                             contentDescription = "검사한 작물 이미지",
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
+                                .size(80.dp)
                                 .clip(RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop
                         )
                     }
                 }
-            }
-
-            // 신뢰도 정보
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = "질병 신뢰도",
-                        fontSize = 12.sp,
-                        color = HomeColors.Secondary
-                    )
-                    Text(
-                        text = "${String.format("%.1f", record.diseaseConfidence * 100)}%",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = HomeColors.OnSurface
-                    )
-                }
-
-                Column {
-                    Text(
-                        text = "검출 신뢰도",
-                        fontSize = 12.sp,
-                        color = HomeColors.Secondary
-                    )
-                    Text(
-                        text = "${String.format("%.1f", record.yoloConfidence * 100)}%",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = HomeColors.OnSurface
-                    )
-                }
-            }
-
-            // 권장사항
-            if (record.recommendations.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
+            } else {
+                // 이미지가 없을 때 기본 아이콘
+                Surface(
+                    modifier = Modifier.size(80.dp),
                     shape = RoundedCornerShape(8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = HomeColors.Background
-                    )
+                    color = HomeColors.Primary.copy(alpha = 0.1f)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Grass,
+                            contentDescription = "작물 아이콘",
+                            tint = HomeColors.Primary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+            }
+
+            // 작물 정보 (3가지 핵심 정보)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // 작물 종류
+                Text(
+                    text = record.cropType,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = HomeColors.OnSurface
+                )
+
+                // 촬영 날짜
+                Text(
+                    text = "📅 ${record.timestamp}",
+                    fontSize = 14.sp,
+                    color = HomeColors.Secondary
+                )
+
+                // 병해 상태 (색상으로 구분)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = record.recommendations,
-                        modifier = Modifier.padding(12.dp),
+                        text = "상태:",
                         fontSize = 14.sp,
-                        color = HomeColors.OnSurface,
-                        lineHeight = 18.sp
+                        color = HomeColors.Secondary
                     )
+
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (record.diseaseStatus.contains("healthy", ignoreCase = true))
+                            Color(0xFF4CAF50).copy(alpha = 0.1f)
+                        else
+                            Color(0xFFFF9800).copy(alpha = 0.1f)
+                    ) {
+                        Text(
+                            text = record.diseaseStatus,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (record.diseaseStatus.contains("healthy", ignoreCase = true))
+                                Color(0xFF4CAF50)
+                            else
+                                Color(0xFFFF9800)
+                        )
+                    }
                 }
             }
         }

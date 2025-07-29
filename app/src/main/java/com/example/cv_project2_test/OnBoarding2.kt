@@ -36,7 +36,8 @@ object OnBoarding2Colors {
 data class FeatureItem(
     val title: String,
     val description: String,
-    val imageUrl: String = "https://placehold.co/130x66"
+    val imageUrl: String = "https://placehold.co/130x66",
+    val drawableRes: Int? = null  // drawable 리소스 ID 추가
 )
 
 @Composable
@@ -47,15 +48,18 @@ fun WeCanFarmOnBoarding2Screen(
     val features = listOf(
         FeatureItem(
             title = "Plant Doctor",
-            description = "AI diagnoses plant problems instantly"
+            description = "AI diagnoses plant problems instantly",
+            drawableRes = R.drawable.plantdoctor  // Plant Doctor 이미지
         ),
         FeatureItem(
             title = "Local Market",
-            description = "Buy & sell fresh produce with neighbors"
+            description = "Buy & sell fresh produce with neighbors",
+            drawableRes = R.drawable.localmarket  // Local Market 이미지 (추가 필요)
         ),
         FeatureItem(
             title = "Community",
-            description = "Get advice from experienced growers"
+            description = "Get advice from experienced growers",
+            drawableRes = R.drawable.community  // Community 이미지 (추가 필요)
         )
     )
 
@@ -155,7 +159,7 @@ fun FeatureCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // 텍스트 영역
+            // 텍스트 영역 (왼쪽)
             Column(
                 modifier = Modifier.width(228.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -176,9 +180,9 @@ fun FeatureCard(
                 )
             }
 
-            // 이미지 영역
+            // 이미지 영역 (오른쪽) - 각 기능에 맞는 이미지 표시
             AsyncImage(
-                model = feature.imageUrl,
+                model = feature.drawableRes ?: feature.imageUrl,  // drawable이 있으면 사용, 없으면 URL 사용
                 contentDescription = feature.title,
                 modifier = Modifier
                     .size(width = 130.dp, height = 66.dp)

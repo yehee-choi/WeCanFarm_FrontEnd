@@ -43,7 +43,8 @@ data class MarketProduct(
     val name: String,
     val seller: String,
     val distance: String,
-    val imageUrl: String
+    val imageUrl: String,
+    val drawableRes: Int? = null  // drawable 리소스 ID 추가
 )
 
 data class CategoryChip(
@@ -65,11 +66,11 @@ fun WeCanFarmMarketScreen(
     onCategoryClick: (String) -> Unit = {},
     onBottomNavClick: (String) -> Unit = {}
 ) {
-    // 상단 배너 상품들
+    // 상단 배너 상품들 - 각각 다른 이미지 적용
     val featuredProducts = listOf(
-        MarketProduct("Homegrown Cherry Tomatoes", "John's Garden", "0.5km", "https://placehold.co/240x320"),
-        MarketProduct("Fresh Basil", "Sarah's Herbs", "1.2km", "https://placehold.co/240x320"),
-        MarketProduct("Ripe Strawberries", "David's Farm", "0.8km", "https://placehold.co/240x320")
+        MarketProduct("Homegrown Cherry Tomatoes", "John's Garden", "0.5km", "https://placehold.co/240x320", R.drawable.tomato),
+        MarketProduct("Fresh Basil", "Sarah's Herbs", "1.2km", "https://placehold.co/240x320", R.drawable.basil1),  // basil 이미지를 drawable에 추가해야 함
+        //MarketProduct("Ripe Strawberries", "David's Farm", "0.8km", "https://placehold.co/240x320", R.drawable.strawberry)  // strawberry 이미지를 drawable에 추가해야 함
     )
 
     // 카테고리 칩들
@@ -275,9 +276,9 @@ fun FeaturedProductCard(
         Column(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 상품 이미지
+            // 상품 이미지 - drawable 리소스 우선 사용
             AsyncImage(
-                model = product.imageUrl,
+                model = product.drawableRes ?: product.imageUrl,  // drawable이 있으면 사용, 없으면 URL 사용
                 contentDescription = product.name,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -407,7 +408,7 @@ fun PopularProductCard(
         ) {
             // 상품 이미지
             AsyncImage(
-                model = product.imageUrl,
+                model = product.drawableRes ?: product.imageUrl,  // drawable이 있으면 사용, 없으면 URL 사용
                 contentDescription = product.name,
                 modifier = Modifier
                     .fillMaxWidth()
