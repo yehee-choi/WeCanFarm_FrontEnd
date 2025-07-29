@@ -1,4 +1,4 @@
-// PlantCheck.kt (카메라 회전 수정된 버전)
+// PlantCheck.kt (수정된 버전 - 바로 카메라 시작)
 package com.example.cv_project2_test
 
 import android.Manifest
@@ -40,6 +40,9 @@ import java.io.*
 import java.net.HttpURLConnection
 import java.net.URL
 import com.google.gson.Gson
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.text.*
+import androidx.compose.ui.text.style.TextDecoration
 
 //데이터 파싱 : 아래와 같은 json파일 형태로 구성
 data class Detection(
@@ -194,10 +197,6 @@ class CameraPreview(
                     parameters.setPreviewSize(it.width, it.height)
                     setParameters(parameters)
                 }
-
-                // 카메라 방향을 올바르게 설정 (회전 문제 해결)
-                setDisplayOrientation(0) // 0도로 설정하여 자연스러운 방향 유지
-
                 setPreviewDisplay(holder)
                 startPreview()
             }
@@ -214,9 +213,8 @@ class CameraPreview(
         camera?.takePicture(null, null) { data, _ ->
             try {
                 val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
-                // 회전을 제거하여 자연스러운 방향 유지
-                // val rotatedBitmap = rotateBitmap(bitmap, 90f) // 기존 회전 코드 제거
-                onPictureTaken(bitmap) // 원본 이미지 그대로 사용
+                val rotatedBitmap = rotateBitmap(bitmap, 90f) // 일반적으로 90도 회전 필요
+                onPictureTaken(rotatedBitmap)
             } catch (e: Exception) {
                 Log.e("CameraPreview", "사진 처리 실패", e)
             }
@@ -231,7 +229,6 @@ class CameraPreview(
         camera = null
     }
 
-    // 필요한 경우에만 사용할 수 있도록 회전 함수는 유지 (현재는 사용하지 않음)
     private fun rotateBitmap(bitmap: Bitmap, degrees: Float): Bitmap {
         val matrix = Matrix().apply { postRotate(degrees) }
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
@@ -599,6 +596,7 @@ fun PlantCheckHeader(onBackClick: () -> Unit) {
 }
 
 @Composable
+//AI 작물 분석(Camera X )
 fun PlantCheckTitle() {
     Text(
         text = "🌱 AI 작물 분석",
@@ -651,8 +649,13 @@ fun CapturedImageView(bitmap: Bitmap) {
     Spacer(modifier = Modifier.height(16.dp))
 }
 
+
+
 @Composable
 fun DetectionResultView(response: DetectionResponse) {
+    var showSolutionPopup by remember { mutableStateOf(false) }
+    var selectedDiseaseStatus by remember { mutableStateOf("") }
+
     Spacer(modifier = Modifier.height(20.dp))
 
     Card(
@@ -700,10 +703,46 @@ fun DetectionResultView(response: DetectionResponse) {
                         Text("📈 질병 신뢰도: ${String.format("%.1f%%", detection.disease_confidence * 100)}")
                         Text("🎯 YOLO 신뢰도: ${String.format("%.1f%%", detection.yolo_confidence * 100)}")
                         Text("📦 위치: [${detection.bbox.joinToString(", ")}]")
+
+                        // 🎯 새로 추가: 솔루션 링크 (질병이 감지된 경우만)
+                        if (detection.disease_status != "건강" &&
+                            detection.disease_status != "healthy" &&
+                            detection.disease_status.isNotEmpty()) {
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            val annotatedString = buildAnnotatedString {
+                                withStyle(
+                                    style = SpanStyle(
+                                        color = Color(0xFF2196F3),
+                                        fontSize = 14.sp,
+                                        textDecoration = TextDecoration.Underline
+                                    )
+                                ) {
+                                    append("치료법 및 예방법 자세히 보기")
+                                }
+                            }
+
+                            ClickableText(
+                                text = annotatedString,
+                                onClick = {
+                                    selectedDiseaseStatus = detection.disease_status
+                                    showSolutionPopup = true
+                                }
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+
+    // 🎯 솔루션 팝업 표시
+    if (showSolutionPopup) {
+        DiseaseSolutionPopup(
+            diseaseStatus = selectedDiseaseStatus,
+            onDismiss = { showSolutionPopup = false }
+        )
     }
 }
 

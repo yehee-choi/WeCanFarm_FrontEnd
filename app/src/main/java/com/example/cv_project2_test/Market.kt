@@ -1,8 +1,9 @@
-// Market.kt
+// Market.kt - ProductManager와 연동된 버전
 @file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.example.cv_project2_test
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.times
 import coil.compose.AsyncImage
 
 // 마켓 화면용 색상
@@ -38,13 +40,14 @@ object MarketColors {
     val BottomNavBorder = Color(0xFFEFF4F2)
 }
 
-// 데이터 클래스들
+// 데이터 클래스들 - imageUri 필드 추가
 data class MarketProduct(
     val name: String,
     val seller: String,
     val distance: String,
     val imageUrl: String,
-    val drawableRes: Int? = null  // drawable 리소스 ID 추가
+    val drawableRes: Int? = null,
+    val imageUri: Uri? = null  // 실제 촬영된 이미지 추가
 )
 
 data class CategoryChip(
@@ -61,34 +64,54 @@ data class MarketNavItem(
 @Composable
 fun WeCanFarmMarketScreen(
     onBackClick: () -> Unit = {},
-    onNavigateToProductRegister: () -> Unit = {},  // 상품등록 화면으로 이동하는 콜백
+    onNavigateToProductRegister: () -> Unit = {},
     onProductClick: (MarketProduct) -> Unit = {},
     onCategoryClick: (String) -> Unit = {},
     onBottomNavClick: (String) -> Unit = {}
 ) {
-    // 상단 배너 상품들 - 각각 다른 이미지 적용
-    val featuredProducts = listOf(
-        MarketProduct("Homegrown Cherry Tomatoes", "John's Garden", "0.5km", "https://placehold.co/240x320", R.drawable.tomato),
-        MarketProduct("Fresh Basil", "Sarah's Herbs", "1.2km", "https://placehold.co/240x320", R.drawable.basil1),  // basil 이미지를 drawable에 추가해야 함
-        //MarketProduct("Ripe Strawberries", "David's Farm", "0.8km", "https://placehold.co/240x320", R.drawable.strawberry)  // strawberry 이미지를 drawable에 추가해야 함
-    )
+    // ProductManager에서 등록된 상품들 가져오기
+    val registeredProducts = ProductManager.products
 
-    // 카테고리 칩들
+    // 등록된 상품을 MarketProduct로 변환
+    val marketProducts = registeredProducts.map { productReg ->
+        MarketProduct(
+            name = if (productReg.isOrganic) "${productReg.cropType} (유기농)" else productReg.cropType,
+            seller = "내 농장",
+            distance = "0.1km",
+            imageUrl = "https://placehold.co/240x320",
+            drawableRes = getDrawableForCrop(productReg.cropType),
+            imageUri = productReg.images.firstOrNull() // 첫 번째 이미지 사용
+        )
+    }
+
+    // 기본 샘플 상품들 (등록된 상품이 없을 때만 표시)
+    val defaultProducts = if (marketProducts.isEmpty()) {
+        listOf(
+            MarketProduct("방울토마토 샘플", "샘플 농장", "0.5km", "https://placehold.co/240x320", R.drawable.tomato),
+            MarketProduct("바질 샘플", "샘플 허브농장", "1.2km", "https://placehold.co/240x320", R.drawable.basil1)
+        )
+    } else emptyList()
+
+    // 추천 상품 (등록된 상품이 있으면 최신 3개, 없으면 기본 상품)
+    val featuredProducts = if (marketProducts.isNotEmpty()) {
+        marketProducts.take(3)
+    } else defaultProducts
+
+    // 인기 상품 (나머지 등록된 상품들)
+    val popularProducts = if (marketProducts.isNotEmpty()) {
+        marketProducts.drop(3)
+    } else emptyList()
+
+    // 카테고리 칩들 - 한국어로 변경
     val categories = listOf(
-        CategoryChip("Vegetables", "🍅"),
-        CategoryChip("Fruits", "🍎"),
-        CategoryChip("Herbs", "🌿"),
-        CategoryChip("Seedlings", "🌱")
-    )
-
-    // 인기 상품들 (그리드용)
-    val popularProducts = listOf(
-        MarketProduct("Organic Carrots", "Emily's Farm", "0.7km", "https://placehold.co/173x231"),
-        MarketProduct("Heirloom Tomatoes", "Mark's Garden", "1.1km", "https://placehold.co/173x231"),
-        MarketProduct("Fresh Basil", "Sophia's Herbs", "0.9km", "https://placehold.co/173x231"),
-        MarketProduct("Local Honey", "Ethan's Apiary", "1.5km", "https://placehold.co/173x231"),
-        MarketProduct("Free-Range Eggs", "Olivia's Coop", "0.6km", "https://placehold.co/173x231"),
-        MarketProduct("Microgreens", "Noah's Greens", "1.3km", "https://placehold.co/173x231")
+        CategoryChip("토마토", "🍅"),
+        CategoryChip("상추", "🥬"),
+        CategoryChip("오이", "🥒"),
+        CategoryChip("당근", "🥕"),
+        CategoryChip("감자", "🥔"),
+        CategoryChip("양파", "🧅"),
+        CategoryChip("배추", "🥗"),
+        CategoryChip("기타", "🌿")
     )
 
     Scaffold(
@@ -115,11 +138,18 @@ fun WeCanFarmMarketScreen(
             }
 
             // 추천 상품 (가로 스크롤)
-            item {
-                FeaturedProductsSection(
-                    products = featuredProducts,
-                    onProductClick = onProductClick
-                )
+            if (featuredProducts.isNotEmpty()) {
+                item {
+                    MarketSectionTitle(
+                        if (marketProducts.isNotEmpty()) "최근 등록된 농산물" else "추천 농산물"
+                    )
+                }
+                item {
+                    FeaturedProductsSection(
+                        products = featuredProducts,
+                        onProductClick = onProductClick
+                    )
+                }
             }
 
             // 카테고리 옵션
@@ -130,18 +160,74 @@ fun WeCanFarmMarketScreen(
                 )
             }
 
-            // "Popular near you" 제목
-            item {
-                MarketSectionTitle("Popular near you")
+            // 인기 상품 그리드 또는 빈 상태 메시지
+            if (popularProducts.isNotEmpty()) {
+                item {
+                    MarketSectionTitle("다른 농산물")
+                }
+                item {
+                    PopularProductsGrid(
+                        products = popularProducts,
+                        onProductClick = onProductClick
+                    )
+                }
+            } else if (marketProducts.isEmpty()) {
+                item {
+                    EmptyStateMessage(onNavigateToProductRegister)
+                }
             }
+        }
+    }
+}
 
-            // 인기 상품 그리드
-            item {
-                PopularProductsGrid(
-                    products = popularProducts,
-                    onProductClick = onProductClick
-                )
-            }
+// 작물 이름에 따른 drawable 리소스 반환
+fun getDrawableForCrop(cropName: String): Int? {
+    return when (cropName) {
+        "토마토" -> R.drawable.tomato
+        "바질" -> R.drawable.basil1
+        else -> null
+    }
+}
+
+@Composable
+fun EmptyStateMessage(onNavigateToProductRegister: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Icon(
+            Icons.Default.ShoppingCart,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MarketColors.Secondary
+        )
+
+        Text(
+            text = "직접 등록한 농산물을 마켓에서 확인해보세요!",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = MarketColors.OnSurface,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            text = "첫 번째 농산물을 등록해보세요",
+            fontSize = 14.sp,
+            color = MarketColors.Secondary,
+            textAlign = TextAlign.Center
+        )
+
+        Button(
+            onClick = onNavigateToProductRegister,
+            modifier = Modifier.padding(top = 8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF738903)
+            )
+        ) {
+            Text("농산물 등록하기")
         }
     }
 }
@@ -149,7 +235,7 @@ fun WeCanFarmMarketScreen(
 @Composable
 fun HeaderSection(
     onBackClick: () -> Unit,
-    onProductRegisterClick: () -> Unit  // 상품등록 버튼 클릭 콜백
+    onProductRegisterClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -182,7 +268,7 @@ fun HeaderSection(
 
         // 상품 등록 버튼
         Button(
-            onClick = onProductRegisterClick,  // ProductRegister 화면으로 이동
+            onClick = onProductRegisterClick,
             modifier = Modifier.height(40.dp),
             shape = RoundedCornerShape(20.dp),
             colors = ButtonDefaults.buttonColors(
@@ -232,7 +318,7 @@ fun SearchSection(onSearchClick: () -> Unit) {
                 Spacer(modifier = Modifier.width(8.dp))
 
                 Text(
-                    text = "What are you looking for?",
+                    text = "찾으시는 농산물이 있나요?",
                     fontSize = 16.sp,
                     color = MarketColors.Secondary
                 )
@@ -270,15 +356,15 @@ fun FeaturedProductCard(
             .height(400.dp),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MarketColors.Surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         onClick = onClick
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 상품 이미지 - drawable 리소스 우선 사용
+            // 상품 이미지 - 실제 촬영 이미지 우선, 그 다음 drawable, 마지막에 URL
             AsyncImage(
-                model = product.drawableRes ?: product.imageUrl,  // drawable이 있으면 사용, 없으면 URL 사용
+                model = product.imageUri ?: product.drawableRes ?: product.imageUrl,
                 contentDescription = product.name,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -370,11 +456,13 @@ fun PopularProductsGrid(
     products: List<MarketProduct>,
     onProductClick: (MarketProduct) -> Unit
 ) {
+    val gridHeight = ((products.size + 1) / 2) * 300.dp
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier
             .fillMaxWidth()
-            .height(800.dp) // 고정 높이로 LazyColumn 내에서 사용
+            .height(gridHeight)
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -399,7 +487,7 @@ fun PopularProductCard(
             .height(280.dp),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MarketColors.Surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         onClick = onClick
     ) {
         Column(
@@ -408,7 +496,7 @@ fun PopularProductCard(
         ) {
             // 상품 이미지
             AsyncImage(
-                model = product.drawableRes ?: product.imageUrl,  // drawable이 있으면 사용, 없으면 URL 사용
+                model = product.imageUri ?: product.drawableRes ?: product.imageUrl,
                 contentDescription = product.name,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -443,7 +531,7 @@ fun BottomNavigationBar(onBottomNavClick: (String) -> Unit) {
     val navItems = listOf(
         MarketNavItem("Home", Icons.Default.Home, false),
         MarketNavItem("Diagnose", Icons.Default.Search, false),
-        MarketNavItem("Market", Icons.Default.ShoppingCart, true), // 현재 선택됨
+        MarketNavItem("Market", Icons.Default.ShoppingCart, true),
         MarketNavItem("Community", Icons.Default.AccountCircle, false),
         MarketNavItem("Profile", Icons.Default.Person, false)
     )
@@ -508,6 +596,6 @@ fun MarketBottomNavItem(
 
 @Preview(showBackground = true)
 @Composable
-fun WeCanFarmFScreenPreview() {
+fun WeCanFarmMarketScreenPreview() {
     WeCanFarmMarketScreen()
 }

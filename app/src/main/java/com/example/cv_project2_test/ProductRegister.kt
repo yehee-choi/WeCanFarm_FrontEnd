@@ -1,9 +1,13 @@
-
 @file:OptIn(ExperimentalMaterial3Api::class)
 
 // ProductRegister.kt
 package com.example.cv_project2_test
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,13 +26,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 
 // 상품 등록 화면용 색상
 object RegisterColors {
@@ -43,7 +53,7 @@ object RegisterColors {
 
 // 데이터 클래스들
 data class ProductRegistration(
-    val images: List<String> = emptyList(),
+    val images: List<Uri> = emptyList(),
     val cropType: String = "",
     val price: String = "",
     val unit: String = "kg",
@@ -60,24 +70,101 @@ data class CropCategory(
     val isSelected: Boolean = false
 )
 
+// 사용자 타입 확인을 위한 enum
+enum class UserType {
+    FARMER, CONSUMER, UNKNOWN
+}
+
+// 간단한 상품 관리 싱글톤
+object ProductManager {
+    private val _products = mutableListOf<ProductRegistration>()
+    val products: List<ProductRegistration> get() = _products
+
+    fun addProduct(product: ProductRegistration) {
+        _products.add(0, product) // 최신 상품을 맨 앞에 추가
+    }
+}
+
 @Composable
 fun WeCanFarmProductRegisterScreen(
+    userType: UserType = UserType.FARMER,
     onBackClick: () -> Unit = {},
-    onImageAddClick: () -> Unit = {},
-    onRegisterClick: (ProductRegistration) -> Unit = {}
+    onRegisterComplete: () -> Unit = {}
 ) {
     var productData by remember { mutableStateOf(ProductRegistration()) }
+    var showDialog by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
+    var currentPhotoUri by remember { mutableStateOf<Uri?>(null) }
 
-    val cropCategories = listOf(
-        CropCategory("토마토", "🍅"),
-        CropCategory("상추", "🥬"),
-        CropCategory("오이", "🥒"),
-        CropCategory("당근", "🥕"),
-        CropCategory("감자", "🥔"),
-        CropCategory("양파", "🧅"),
-        CropCategory("배추", "🥗"),
-        CropCategory("기타", "🌿")
-    )
+    val context = LocalContext.current
+    val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+
+    // 카메라 촬영 결과 처리 (먼저 정의)
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && currentPhotoUri != null) {
+            // 촬영 성공 시 이미지를 리스트에 추가
+            productData = productData.copy(
+                images = productData.images + currentPhotoUri!!
+            )
+        }
+        currentPhotoUri = null // 초기화
+    }
+
+    // 카메라 권한 요청 (takePictureLauncher 사용)
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // 권한이 허용되면 카메라 실행
+            val photoFile = File(context.cacheDir, "crop_image_$timeStamp.jpg")
+            val photoUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.provider",
+                photoFile
+            )
+            currentPhotoUri = photoUri
+            takePictureLauncher.launch(photoUri)
+        } else {
+            // 권한 거부 처리 - 아무것도 하지 않음
+        }
+    }
+
+    // 농부가 아닌 경우 접근 제한 다이얼로그
+    if (userType != UserType.FARMER && showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("접근 권한 없음") },
+            text = { Text("농산물 등록은 농부 회원만 가능합니다.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDialog = false
+                    onBackClick()
+                }) {
+                    Text("확인")
+                }
+            }
+        )
+    }
+
+    // 등록 성공 다이얼로그
+    if (showSuccessDialog) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("등록 완료!") },
+            text = { Text("농산물이 성공적으로 등록되었습니다.\n마켓에서 확인할 수 있습니다.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSuccessDialog = false
+                    onRegisterComplete()
+                }) {
+                    Text("확인")
+                }
+            }
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -94,7 +181,32 @@ fun WeCanFarmProductRegisterScreen(
         item {
             ImageRegistrationSection(
                 images = productData.images,
-                onImageAddClick = onImageAddClick,
+                userType = userType,
+                onImageAddClick = {
+                    if (userType != UserType.FARMER) {
+                        showDialog = true
+                    } else {
+                        // 카메라 권한 확인 후 촬영
+                        when (PackageManager.PERMISSION_GRANTED) {
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) -> {
+                                // 권한이 있으면 바로 카메라 실행
+                                val newTimeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                                val photoFile = File(context.cacheDir, "crop_image_$newTimeStamp.jpg")
+                                val photoUri = FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.provider",
+                                    photoFile
+                                )
+                                currentPhotoUri = photoUri
+                                takePictureLauncher.launch(photoUri)
+                            }
+                            else -> {
+                                // 권한 요청
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        }
+                    }
+                },
                 onImageRemove = { index ->
                     productData = productData.copy(
                         images = productData.images.toMutableList().apply { removeAt(index) }
@@ -106,7 +218,6 @@ fun WeCanFarmProductRegisterScreen(
         // 작물 종류 선택
         item {
             CropTypeSection(
-                categories = cropCategories,
                 selectedCrop = productData.cropType,
                 onCropSelect = { cropName ->
                     productData = productData.copy(cropType = cropName)
@@ -181,8 +292,24 @@ fun WeCanFarmProductRegisterScreen(
         // 등록 버튼
         item {
             RegisterButtonSection(
-                onRegisterClick = { onRegisterClick(productData) },
-                isValid = isFormValid(productData)
+                onRegisterClick = {
+                    if (userType != UserType.FARMER) {
+                        showDialog = true
+                    } else {
+                        isLoading = true
+
+                        // ProductManager를 통해 상품 등록
+                        ProductManager.addProduct(productData)
+
+                        // 1초 지연 후 성공 다이얼로그 표시
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            isLoading = false
+                            showSuccessDialog = true
+                        }, 1000)
+                    }
+                },
+                isValid = isFormValid(productData),
+                isLoading = isLoading
             )
         }
 
@@ -203,7 +330,6 @@ fun RegisterHeaderSection(onBackClick: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 뒤로가기 버튼
         IconButton(
             onClick = onBackClick,
             modifier = Modifier.size(48.dp)
@@ -215,7 +341,6 @@ fun RegisterHeaderSection(onBackClick: () -> Unit) {
             )
         }
 
-        // 제목
         Text(
             text = "농산물 등록",
             fontSize = 20.sp,
@@ -225,14 +350,14 @@ fun RegisterHeaderSection(onBackClick: () -> Unit) {
             modifier = Modifier.weight(1f)
         )
 
-        // 여백 (대칭을 위해)
         Spacer(modifier = Modifier.size(48.dp))
     }
 }
 
 @Composable
 fun ImageRegistrationSection(
-    images: List<String>,
+    images: List<Uri>,
+    userType: UserType,
     onImageAddClick: () -> Unit,
     onImageRemove: (Int) -> Unit
 ) {
@@ -262,14 +387,17 @@ fun ImageRegistrationSection(
             // 이미지 추가 버튼 (첫 번째)
             if (images.size < 5) {
                 item {
-                    ImageAddButton(onClick = onImageAddClick)
+                    ImageAddButton(
+                        onClick = onImageAddClick,
+                        enabled = userType == UserType.FARMER
+                    )
                 }
             }
 
             // 등록된 이미지들
             items(images.size) { index ->
                 ImagePreviewCard(
-                    imageUrl = images[index],
+                    imageUri = images[index],
                     onRemove = { onImageRemove(index) }
                 )
             }
@@ -278,13 +406,16 @@ fun ImageRegistrationSection(
 }
 
 @Composable
-fun ImageAddButton(onClick: () -> Unit) {
+fun ImageAddButton(
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
     Surface(
         modifier = Modifier
             .size(120.dp)
-            .clickable { onClick() },
+            .clickable(enabled = enabled) { onClick() },
         shape = RoundedCornerShape(12.dp),
-        color = RegisterColors.ImagePlaceholder,
+        color = if (enabled) RegisterColors.ImagePlaceholder else RegisterColors.Border,
         border = BorderStroke(2.dp, RegisterColors.Border)
     ) {
         Column(
@@ -293,16 +424,16 @@ fun ImageAddButton(onClick: () -> Unit) {
             verticalArrangement = Arrangement.Center
         ) {
             Icon(
-                Icons.Default.Add,
-                contentDescription = "이미지 추가",
-                tint = RegisterColors.Secondary,
+                Icons.Default.CameraAlt,
+                contentDescription = "사진 촬영",
+                tint = if (enabled) RegisterColors.Secondary else RegisterColors.Secondary.copy(alpha = 0.5f),
                 modifier = Modifier.size(32.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "사진 추가",
+                text = "사진 촬영",
                 fontSize = 12.sp,
-                color = RegisterColors.Secondary,
+                color = if (enabled) RegisterColors.Secondary else RegisterColors.Secondary.copy(alpha = 0.5f),
                 textAlign = TextAlign.Center
             )
         }
@@ -311,14 +442,14 @@ fun ImageAddButton(onClick: () -> Unit) {
 
 @Composable
 fun ImagePreviewCard(
-    imageUrl: String,
+    imageUri: Uri,
     onRemove: () -> Unit
 ) {
     Box(
         modifier = Modifier.size(120.dp)
     ) {
         AsyncImage(
-            model = imageUrl,
+            model = imageUri,
             contentDescription = "Product Image",
             modifier = Modifier
                 .fillMaxSize()
@@ -351,16 +482,26 @@ fun ImagePreviewCard(
 
 @Composable
 fun CropTypeSection(
-    categories: List<CropCategory>,
     selectedCrop: String,
     onCropSelect: (String) -> Unit
 ) {
+    val cropCategories = listOf(
+        CropCategory("토마토", "🍅"),
+        CropCategory("상추", "🥬"),
+        CropCategory("오이", "🥒"),
+        CropCategory("당근", "🥕"),
+        CropCategory("감자", "🥔"),
+        CropCategory("양파", "🧅"),
+        CropCategory("배추", "🥗"),
+        CropCategory("기타", "🌿")
+    )
+
     RegisterSection(title = "작물 종류") {
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(categories.size) { index ->
-                val category = categories[index]
+            items(cropCategories.size) { index ->
+                val category = cropCategories[index]
                 CropChip(
                     category = category.copy(isSelected = category.name == selectedCrop),
                     onClick = { onCropSelect(category.name) }
@@ -579,7 +720,8 @@ fun RegisterSection(
 @Composable
 fun RegisterButtonSection(
     onRegisterClick: () -> Unit,
-    isValid: Boolean
+    isValid: Boolean,
+    isLoading: Boolean = false
 ) {
     Column(
         modifier = Modifier
@@ -592,7 +734,7 @@ fun RegisterButtonSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            enabled = isValid,
+            enabled = isValid && !isLoading,
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = RegisterColors.Primary,
@@ -600,11 +742,18 @@ fun RegisterButtonSection(
                 disabledContainerColor = RegisterColors.Border
             )
         ) {
-            Text(
-                text = "농산물 등록하기",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = RegisterColors.OnSurface
+                )
+            } else {
+                Text(
+                    text = "농산물 등록하기",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }
@@ -615,10 +764,13 @@ fun isFormValid(productData: ProductRegistration): Boolean {
             productData.quantity.isNotEmpty() &&
             productData.description.isNotEmpty() &&
             productData.pickupLocation.isNotEmpty()
+    // 이미지는 선택사항으로 변경 (카메라 테스트를 위해)
 }
 
 @Preview(showBackground = true)
 @Composable
 fun WeCanFarmProductRegisterScreenPreview() {
-    WeCanFarmProductRegisterScreen()
+    WeCanFarmProductRegisterScreen(
+        userType = UserType.FARMER
+    )
 }
