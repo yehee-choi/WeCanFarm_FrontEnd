@@ -80,7 +80,7 @@ val serverUrl = "https://your-server-url.ngrok-free.app"
 ```
 
 ## 📁 프로젝트 구조
-'''
+```
 📁 com/example/cv_project2_test/
 ├── 📱 ui/
 │   ├── 🎨 onboarding/
@@ -103,8 +103,8 @@ val serverUrl = "https://your-server-url.ngrok-free.app"
 ├── 🌐 network/                     # API 통신
 ├── 📷 camera/                      # 카메라 관련
 └── 🛠️ utils/                       # 유틸리티
+```
 
-'''
 ## 📱 주요 화면 및 기능
 
 ### 1. 온보딩 (OnBoarding.kt, OnBoarding2.kt)
