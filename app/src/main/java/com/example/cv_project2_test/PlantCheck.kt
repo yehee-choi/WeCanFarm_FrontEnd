@@ -1,4 +1,4 @@
-// PlantCheck.kt (수정된 버전 - 바로 카메라 시작)
+// PlantCheck.kt (카메라 회전 수정된 버전)
 package com.example.cv_project2_test
 
 import android.Manifest
@@ -194,6 +194,10 @@ class CameraPreview(
                     parameters.setPreviewSize(it.width, it.height)
                     setParameters(parameters)
                 }
+
+                // 카메라 방향을 올바르게 설정 (회전 문제 해결)
+                setDisplayOrientation(0) // 0도로 설정하여 자연스러운 방향 유지
+
                 setPreviewDisplay(holder)
                 startPreview()
             }
@@ -210,8 +214,9 @@ class CameraPreview(
         camera?.takePicture(null, null) { data, _ ->
             try {
                 val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
-                val rotatedBitmap = rotateBitmap(bitmap, 90f) // 일반적으로 90도 회전 필요
-                onPictureTaken(rotatedBitmap)
+                // 회전을 제거하여 자연스러운 방향 유지
+                // val rotatedBitmap = rotateBitmap(bitmap, 90f) // 기존 회전 코드 제거
+                onPictureTaken(bitmap) // 원본 이미지 그대로 사용
             } catch (e: Exception) {
                 Log.e("CameraPreview", "사진 처리 실패", e)
             }
@@ -226,6 +231,7 @@ class CameraPreview(
         camera = null
     }
 
+    // 필요한 경우에만 사용할 수 있도록 회전 함수는 유지 (현재는 사용하지 않음)
     private fun rotateBitmap(bitmap: Bitmap, degrees: Float): Bitmap {
         val matrix = Matrix().apply { postRotate(degrees) }
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
