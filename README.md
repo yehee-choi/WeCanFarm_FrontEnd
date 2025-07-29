@@ -81,8 +81,7 @@ val serverUrl = "https://your-server-url.ngrok-free.app"
 
 ## 📁 프로젝트 구조
 
-📁 권장하는 향후 구조:
-com/example/cv_project2_test/
+📁 com/example/cv_project2_test/
 ├── 📱 ui/
 │   ├── 🎨 onboarding/
 │   │   ├── OnBoardingScreen.kt
@@ -98,12 +97,12 @@ com/example/cv_project2_test/
 │       ├── MarketScreen.kt
 │       └── ProductRegisterScreen.kt
 ├── 📊 data/
-│   ├── model/                           // 데이터 모델들
-│   ├── session/                         // 세션 관리
-│   └── history/                         // 진단 기록 관리  
-├── 🌐 network/                          // API 통신
-├── 📷 camera/                           // 카메라 관련
-└── 🛠️ utils/                            // 유틸리티
+│   ├── model/                      # 데이터 모델들
+│   ├── session/                    # 세션 관리
+│   └── history/                    # 진단 기록 관리  
+├── 🌐 network/                     # API 통신
+├── 📷 camera/                      # 카메라 관련
+└── 🛠️ utils/                       # 유틸리티
 
 ## 📱 주요 화면 및 기능
 
