@@ -26,7 +26,6 @@
         android:allowBackup="true"
         android:appComponentFactory="androidx.core.app.CoreComponentFactory"
         android:dataExtractionRules="@xml/file_paths"
-        android:debuggable="true"
         android:extractNativeLibs="false"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -56,15 +55,15 @@
             android:name="androidx.activity.ComponentActivity"
             android:exported="true" />
 
-        <!-- 카메라 서비스 -->
-        <service
-            android:name="androidx.camera.core.impl.MetadataHolderService"
-            android:enabled="false"
-            android:exported="false" >
-            <meta-data
-                android:name="androidx.camera.core.impl.MetadataHolderService.DEFAULT_CONFIG_PROVIDER"
-                android:value="androidx.camera.camera2.Camera2Config$DefaultProvider" />
-        </service>
+<!--        &lt;!&ndash; 카메라 서비스 &ndash;&gt;-->
+<!--        <service-->
+<!--            android:name="androidx.camera.core.impl.MetadataHolderService"-->
+<!--            android:enabled="false"-->
+<!--            android:exported="false" >-->
+<!--            <meta-data-->
+<!--                android:name="androidx.camera.core.impl.MetadataHolderService.DEFAULT_CONFIG_PROVIDER"-->
+<!--                android:value="androidx.camera.camera2.Camera2Config$DefaultProvider" />-->
+<!--        </service>-->
 
         <!-- 다른 프로바이더들 -->
         <provider

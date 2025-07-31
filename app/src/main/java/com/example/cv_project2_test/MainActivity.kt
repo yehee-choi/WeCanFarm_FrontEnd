@@ -405,6 +405,7 @@ fun WeCanFarmLoginScreen(
                             }
 
                         } catch (e: Exception) {
+                            //정해진 Jsoon 파일 변환 형식이 아님, 혹은 해당 파일의 확장자가 json이 아님.
                             // JSON 파싱 실패
                             isSuccess = false
                             alertMessage = "응답이 없습니다"
